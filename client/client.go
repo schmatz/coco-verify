@@ -42,24 +42,28 @@ func simulateGame(pairToSimulate lib.GameSessionPair) GameSessionResults {
 	command.Dir = "***REMOVED***"
 	out, err := command.Output()
 	if err != nil {
+		fmt.Println("error running command!")
 		fmt.Println(string(out))
 		log.Fatal(err)
 	}
 	results.Winner = string(out)
+	fmt.Println("Calculated a game with result: ", results.Winner)
 	return results
 }
 
 func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSessionPair, r redis.Conn) {
 	var winningIndex, losingIndex int
 	if resultString == "tie" {
-		_, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetLosingRedisKey(), gameSessionPair[1].ID.Hex()))
-		if err != nil {
-			panic(err)
-		}
-		_, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetLosingRedisKey(), gameSessionPair[0].ID.Hex()))
-		if err != nil {
-			panic(err)
-		}
+		/*
+			_, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetLosingRedisKey(), gameSessionPair[1].ID.Hex()))
+			if err != nil {
+				panic(err)
+			}
+			_, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetLosingRedisKey(), gameSessionPair[0].ID.Hex()))
+			if err != nil {
+				panic(err)
+			}
+		*/
 
 	} else {
 		switch resultString {

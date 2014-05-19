@@ -37,8 +37,8 @@ func (g *GameSession) GetLosingRedisKey() string {
 
 func newPool() *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     4,
-		MaxActive:   10,
+		MaxIdle:     100,
+		MaxActive:   500,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", RedisHost)

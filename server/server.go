@@ -28,7 +28,7 @@ func getSpotInstanceRequests(e *ec2.EC2) []ec2.SpotRequestResult {
 	return spotRequests.SpotRequestResults
 }
 
-func connectToMongoAndGetCollection() *mgo.Collection {
+func ConnectToMongoAndGetCollection() *mgo.Collection {
 	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
 	mongoSession, err := mgo.Dial(connectionURL)
 	if err != nil {
@@ -39,7 +39,7 @@ func connectToMongoAndGetCollection() *mgo.Collection {
 	return c
 }
 
-func getAllRelevantSessions(levelSessionsCollection *mgo.Collection) []lib.GameSession {
+func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) []lib.GameSession {
 	var gameSessions []lib.GameSession
 	queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true}
 	selection := bson.M{"team": 1}
@@ -85,8 +85,8 @@ func insertPairsIntoRedisQueue(pairs []lib.GameSessionPair, redisConnection redi
 	}
 }
 func main() {
-	c := connectToMongoAndGetCollection()
-	unprocessedSessions := getAllRelevantSessions(c)
+	c := ConnectToMongoAndGetCollection()
+	unprocessedSessions := GetAllRelevantSessions(c)
 	humans, ogres := sortSessionsIntoHumansAndOgres(unprocessedSessions)
 	allSessionPairs := generateAllSessionPairs(humans, ogres)
 	fmt.Println("Generated", len(allSessionPairs), "session pairs!")
