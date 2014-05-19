@@ -16,7 +16,6 @@ type GameSessionResults struct {
 
 func convertPairStringToGameSessionPair(p string) lib.GameSessionPair {
 	var sessionPair lib.GameSessionPair
-	fmt.Println(p[:23])
 	sessionPair[0] = lib.GameSession{bson.ObjectIdHex(string(p[:24])), "humans"}
 	sessionPair[1] = lib.GameSession{bson.ObjectIdHex(string(p[24:])), "ogres"}
 	return sessionPair
