@@ -7,7 +7,10 @@ import (
 	"labix.org/v2/mgo/bson"
 	"log"
 	"os/exec"
+	"runtime"
 )
+
+var pool *redis.Pool
 
 type GameSessionResults struct {
 	GameSessionPair lib.GameSessionPair
@@ -23,6 +26,7 @@ func convertPairStringToGameSessionPair(p string) lib.GameSessionPair {
 func getGameSessionPairToProcess(r redis.Conn) lib.GameSessionPair {
 	rawString, err := redis.String(r.Do("SPOP", lib.UnprocessedSetName))
 	if err != nil {
+		fmt.Println(rawString)
 		panic(err)
 	}
 	_, err = r.Do("SADD", lib.ProcessingName, rawString)
@@ -88,15 +92,51 @@ func recordResults(results GameSessionResults, r redis.Conn) {
 	}
 
 }
-func processGame(r redis.Conn) {
+func checkIfGameAvailable(r redis.Conn) bool {
+	games, err := redis.Int(r.Do("SCARD", lib.UnprocessedSetName))
+	if err != nil {
+		panic(err)
+	}
+	if games == 0 {
+		return false
+	}
+	return true
+}
+func processGame(sem chan bool, noMoreGames chan bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered! Most likely games ran out in the middle of a goroutine. Recovery:", r)
+		}
+	}()
+	r := pool.Get()
+	defer r.Close()
+	defer func() { <-sem }()
+	gameIsAvailable := checkIfGameAvailable(r)
+	if !gameIsAvailable {
+		noMoreGames <- true
+		return
+	}
 	gameSessionPairToProcess := getGameSessionPairToProcess(r)
 	results := simulateGame(gameSessionPairToProcess)
 	recordResults(results, r)
 
 }
 func main() {
-	//machineCores = runtime.NumCPU()
-	r := lib.ConnectToRedis()
-	processGame(r)
+	pool = lib.ConnectToRedisPooled()
+	machineCores := runtime.NumCPU()
+	runtime.GOMAXPROCS(machineCores)
+	//counting semaphore for limiting resources
+	sem := make(chan bool, machineCores)
+	noMoreGames := make(chan bool)
+	for {
+		select {
+		case _ = <-noMoreGames:
+			fmt.Println("There are no more games to simulate!")
+			return
+		case sem <- true:
+			go processGame(sem, noMoreGames)
+		}
+
+	}
 
 }

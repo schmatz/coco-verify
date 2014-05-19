@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"labix.org/v2/mgo/bson"
+	"time"
 )
 
 const DatabaseName string = "coco"
@@ -34,6 +35,29 @@ func (g *GameSession) GetLosingRedisKey() string {
 	return g.ID.Hex() + "l"
 }
 
+func newPool() *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     4,
+		MaxActive:   10,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", RedisHost)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := c.Do("AUTH", RedisPassword); err != nil {
+				c.Close()
+				return nil, err
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+}
+
 func ConnectToRedis() redis.Conn {
 	redisConnection, err := redis.Dial("tcp", RedisHost)
 	if err != nil {
@@ -45,4 +69,8 @@ func ConnectToRedis() redis.Conn {
 	}
 	fmt.Println("Connected to Redis!")
 	return redisConnection
+}
+
+func ConnectToRedisPooled() *redis.Pool {
+	return newPool()
 }
