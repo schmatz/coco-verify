@@ -3,10 +3,30 @@ package main
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"github.com/mitchellh/goamz/aws"
+	"github.com/mitchellh/goamz/ec2"
 	"github.com/schmatz/coco-verify/lib"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 )
+
+type SpotRequestResp ec2.SpotRequestsResp
+
+func connectToEC2() *ec2.EC2 {
+	auth, err := aws.GetAuth("***REMOVED***", "***REMOVED***")
+	if err != nil {
+		panic(err)
+	}
+	return ec2.New(auth, aws.USEast)
+}
+
+func getSpotInstanceRequests(e *ec2.EC2) []ec2.SpotRequestResult {
+	spotRequests, err := e.DescribeSpotRequests(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	return spotRequests.SpotRequestResults
+}
 
 func connectToMongoAndGetCollection() *mgo.Collection {
 	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
@@ -72,5 +92,7 @@ func main() {
 	fmt.Println("Generated", len(allSessionPairs), "session pairs!")
 	r := lib.ConnectToRedis()
 	insertPairsIntoRedisQueue(allSessionPairs, r)
+	e := connectToEC2()
+	getSpotInstanceRequests(e)
 
 }
