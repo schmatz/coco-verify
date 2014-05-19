@@ -5,6 +5,8 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/schmatz/coco-verify/lib"
 	"labix.org/v2/mgo/bson"
+	"log"
+	"os/exec"
 )
 
 type GameSessionResults struct {
@@ -24,33 +26,37 @@ func getGameSessionPairToProcess(r redis.Conn) lib.GameSessionPair {
 	if err != nil {
 		panic(err)
 	}
-	n, err := r.Do("SADD", lib.ProcessingName, rawString)
+	_, err = r.Do("SADD", lib.ProcessingName, rawString)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Moved", n, "members to processing state!")
 	return convertPairStringToGameSessionPair(rawString)
 }
 func simulateGame(pairToSimulate lib.GameSessionPair) GameSessionResults {
 	var results GameSessionResults
 	results.GameSessionPair = pairToSimulate
-	//do simulation here
-	results.Winner = "ogres"
+	command := exec.Command("coffee", "simulate.coffee", pairToSimulate[0].ID.Hex(), pairToSimulate[1].ID.Hex())
+	command.Dir = "***REMOVED***"
+	out, err := command.Output()
+	if err != nil {
+		fmt.Println(string(out))
+		log.Fatal(err)
+	}
+	results.Winner = string(out)
 	return results
 }
 
 func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSessionPair, r redis.Conn) {
 	var winningIndex, losingIndex int
 	if resultString == "tie" {
-		n, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetLosingRedisKey(), gameSessionPair[1].ID.Hex()))
+		_, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetLosingRedisKey(), gameSessionPair[1].ID.Hex()))
 		if err != nil {
 			panic(err)
 		}
-		n, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetLosingRedisKey(), gameSessionPair[0].ID.Hex()))
+		_, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetLosingRedisKey(), gameSessionPair[0].ID.Hex()))
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Moved", n, "games to tie")
 
 	} else {
 		switch resultString {
@@ -61,27 +67,26 @@ func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSess
 			winningIndex = 1
 			losingIndex = 0
 		}
-		n, err := redis.Int(r.Do("SADD", gameSessionPair[winningIndex].GetWinningRedisKey(), gameSessionPair[losingIndex].ID.Hex()))
+		_, err := redis.Int(r.Do("SADD", gameSessionPair[winningIndex].GetWinningRedisKey(), gameSessionPair[losingIndex].ID.Hex()))
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Added", n, "game to", gameSessionPair[winningIndex].GetWinningRedisKey())
-		n, err = redis.Int(r.Do("SADD", gameSessionPair[losingIndex].GetLosingRedisKey(), gameSessionPair[winningIndex].ID.Hex()))
+
+		_, err = redis.Int(r.Do("SADD", gameSessionPair[losingIndex].GetLosingRedisKey(), gameSessionPair[winningIndex].ID.Hex()))
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Added", n, "game to", gameSessionPair[losingIndex].GetLosingRedisKey())
+
 	}
 
 }
 func recordResults(results GameSessionResults, r redis.Conn) {
 	addResultsToWinsAndLosses(results.Winner, results.GameSessionPair, r)
 
-	n, err := r.Do("SMOVE", lib.ProcessingName, lib.ProcessedSetName, results.GameSessionPair.RedisQueueKey())
+	_, err := r.Do("SMOVE", lib.ProcessingName, lib.ProcessedSetName, results.GameSessionPair.RedisQueueKey())
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Moved", n, "results to processed state!")
 
 }
 func processGame(r redis.Conn) {
