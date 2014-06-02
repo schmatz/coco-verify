@@ -8,9 +8,11 @@ import (
 	"log"
 	"os/exec"
 	"runtime"
+	"sync"
 )
 
 var pool *redis.Pool
+var w sync.WaitGroup
 
 type GameSessionResults struct {
 	GameSessionPair lib.GameSessionPair
@@ -47,7 +49,7 @@ func simulateGame(pairToSimulate lib.GameSessionPair) GameSessionResults {
 		log.Fatal(err)
 	}
 	results.Winner = string(out)
-	fmt.Println("Calculated a game with result: ", results.Winner)
+	fmt.Println(results.GameSessionPair[0].ID, "vs", results.GameSessionPair[1].ID, "=", results.Winner)
 	return results
 }
 
@@ -64,7 +66,6 @@ func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSess
 				panic(err)
 			}
 		*/
-
 	} else {
 		switch resultString {
 		case "humans":
@@ -73,6 +74,8 @@ func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSess
 		case "ogres":
 			winningIndex = 1
 			losingIndex = 0
+		default:
+			fmt.Println("You screwed up with the switch, buddy")
 		}
 		_, err := redis.Int(r.Do("SADD", gameSessionPair[winningIndex].GetWinningRedisKey(), gameSessionPair[losingIndex].ID.Hex()))
 		if err != nil {
@@ -107,6 +110,7 @@ func checkIfGameAvailable(r redis.Conn) bool {
 	return true
 }
 func processGame(sem chan bool, noMoreGames chan bool) {
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered! Most likely games ran out in the middle of a goroutine. Recovery:", r)
@@ -115,6 +119,7 @@ func processGame(sem chan bool, noMoreGames chan bool) {
 	r := pool.Get()
 	defer r.Close()
 	defer func() { <-sem }()
+	defer w.Done()
 	gameIsAvailable := checkIfGameAvailable(r)
 	if !gameIsAvailable {
 		noMoreGames <- true
@@ -130,17 +135,21 @@ func main() {
 	machineCores := runtime.NumCPU()
 	runtime.GOMAXPROCS(machineCores)
 	//counting semaphore for limiting resources
+
 	sem := make(chan bool, machineCores)
 	noMoreGames := make(chan bool)
-	for {
+	for done := false; !done; {
 		select {
 		case _ = <-noMoreGames:
-			fmt.Println("There are no more games to simulate!")
-			return
+			done = true
+			break
 		case sem <- true:
+			w.Add(1)
 			go processGame(sem, noMoreGames)
 		}
-
 	}
+	close(sem)
+	close(noMoreGames)
+	w.Wait()
 
 }

@@ -3,30 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"github.com/mitchellh/goamz/aws"
-	"github.com/mitchellh/goamz/ec2"
 	"github.com/schmatz/coco-verify/lib"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 )
 
-type SpotRequestResp ec2.SpotRequestsResp
-
-func connectToEC2() *ec2.EC2 {
-	auth, err := aws.GetAuth("***REMOVED***", "***REMOVED***")
-	if err != nil {
-		panic(err)
-	}
-	return ec2.New(auth, aws.USEast)
-}
-
-func getSpotInstanceRequests(e *ec2.EC2) []ec2.SpotRequestResult {
-	spotRequests, err := e.DescribeSpotRequests(nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	return spotRequests.SpotRequestResults
-}
+const numberOfTopGamesToRank = 10
 
 func ConnectToMongoAndGetCollection() *mgo.Collection {
 	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
@@ -39,16 +21,31 @@ func ConnectToMongoAndGetCollection() *mgo.Collection {
 	return c
 }
 
-func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) []lib.GameSession {
-	var gameSessions []lib.GameSession
-	queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true}
-	selection := bson.M{"team": 1}
-	err := levelSessionsCollection.Find(queryParameters).Select(selection).All(&gameSessions)
-	if err != nil {
-		panic(err)
+func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) (topHumanSessions, topOgreSessions []lib.GameSession) {
+	teams := [2]string{"humans", "ogres"}
+	for _, teamName := range teams {
+		queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true, "team": teamName}
+		selection := bson.M{"team": 1, "totalScore": 1, "creatorName": 1}
+		sort := bson.M{"totalScore": -1}
+		pipe := levelSessionsCollection.Pipe([]bson.M{{"$match": queryParameters}, {"$project": selection}, {"$sort": sort}, {"$limit": numberOfTopGamesToRank}})
+		var err error
+		var documentCount int
+		if teamName == "humans" {
+			err = pipe.All(&topHumanSessions)
+			documentCount = len(topHumanSessions)
+			fmt.Println("Top human player is", topHumanSessions[0].CreatorName)
+		} else {
+			err = pipe.All(&topOgreSessions)
+			documentCount = len(topOgreSessions)
+		}
+
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Retrieved", documentCount, teamName, "sessions!")
 	}
-	fmt.Println("Retrieved", len(gameSessions), "sessions to verify!")
-	return gameSessions
+
+	return topHumanSessions, topOgreSessions
 }
 
 func sortSessionsIntoHumansAndOgres(unsorted []lib.GameSession) (humans, ogres []lib.GameSession) {
@@ -66,6 +63,7 @@ func generateAllSessionPairs(humans, ogres []lib.GameSession) []lib.GameSessionP
 	var allSessionPairs []lib.GameSessionPair
 
 	for _, humanSession := range humans {
+		humanSession = lib.GameSession{bson.ObjectIdHex("***REMOVED***"), "humans", ""}
 		for _, ogreSession := range ogres {
 			allSessionPairs = append(allSessionPairs, lib.GameSessionPair{humanSession, ogreSession})
 		}
@@ -86,13 +84,9 @@ func insertPairsIntoRedisQueue(pairs []lib.GameSessionPair, redisConnection redi
 }
 func main() {
 	c := ConnectToMongoAndGetCollection()
-	unprocessedSessions := GetAllRelevantSessions(c)
-	humans, ogres := sortSessionsIntoHumansAndOgres(unprocessedSessions)
+	humans, ogres := GetAllRelevantSessions(c)
 	allSessionPairs := generateAllSessionPairs(humans, ogres)
 	fmt.Println("Generated", len(allSessionPairs), "session pairs!")
 	r := lib.ConnectToRedis()
 	insertPairsIntoRedisQueue(allSessionPairs, r)
-	e := connectToEC2()
-	getSpotInstanceRequests(e)
-
 }

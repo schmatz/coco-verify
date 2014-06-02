@@ -131,8 +131,20 @@ func main() {
 	for i, result := range results {
 		results[i] = result.getCreatorName(c)
 	}
+	fmt.Println("Top ogres")
 	for i := 0; i < len(results); i++ {
 		result := results[i]
+		if result.Session.Team != "ogres" {
+			continue
+		}
+		fmt.Println("Creator:", result.CreatorName, "Team:", result.Session.Team, "Wins:", result.Wins, "Losses:", result.Losses)
+	}
+	fmt.Println("Top humans")
+	for i := 0; i < len(results); i++ {
+		result := results[i]
+		if result.Session.Team != "humans" {
+			continue
+		}
 		fmt.Println("Creator:", result.CreatorName, "Team:", result.Session.Team, "Wins:", result.Wins, "Losses:", result.Losses)
 	}
 
