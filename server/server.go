@@ -25,7 +25,7 @@ func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) (topHumanSe
 	teams := [2]string{"humans", "ogres"}
 	for _, teamName := range teams {
 		queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true, "team": teamName}
-		selection := bson.M{"team": 1, "totalScore": 1, "creatorName": 1}
+		selection := bson.M{"team": 1, "totalScore": 1}
 		sort := bson.M{"totalScore": -1}
 		pipe := levelSessionsCollection.Pipe([]bson.M{{"$match": queryParameters}, {"$project": selection}, {"$sort": sort}, {"$limit": numberOfTopGamesToRank}})
 		var err error
@@ -33,7 +33,6 @@ func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) (topHumanSe
 		if teamName == "humans" {
 			err = pipe.All(&topHumanSessions)
 			documentCount = len(topHumanSessions)
-			fmt.Println("Top human player is", topHumanSessions[0].CreatorName)
 		} else {
 			err = pipe.All(&topOgreSessions)
 			documentCount = len(topOgreSessions)
@@ -63,7 +62,6 @@ func generateAllSessionPairs(humans, ogres []lib.GameSession) []lib.GameSessionP
 	var allSessionPairs []lib.GameSessionPair
 
 	for _, humanSession := range humans {
-		humanSession = lib.GameSession{bson.ObjectIdHex("***REMOVED***"), "humans", ""}
 		for _, ogreSession := range ogres {
 			allSessionPairs = append(allSessionPairs, lib.GameSessionPair{humanSession, ogreSession})
 		}

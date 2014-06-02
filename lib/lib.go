@@ -19,9 +19,8 @@ const ProcessedSetName string = "processed"
 const ProcessingName string = "processing"
 
 type GameSession struct {
-	ID          bson.ObjectId `bson:"_id,omitempty"`
-	Team        string
-	CreatorName string `bson:"creatorName,omitempty"`
+	ID   bson.ObjectId `bson:"_id,omitempty"`
+	Team string
 }
 
 type GameSessionPair [2]GameSession
