@@ -8,7 +8,7 @@ import (
 	"labix.org/v2/mgo/bson"
 )
 
-const numberOfTopGamesToRank = 10
+const numberOfTopGamesToRank = 500
 
 func ConnectToMongoAndGetCollection() *mgo.Collection {
 	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"

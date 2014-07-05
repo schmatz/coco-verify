@@ -11,13 +11,18 @@ import (
 
 type MongoCreatorName struct {
 	CreatorName string `bson:"creatorName" json:"creatorName"`
+	Playtime    int    `bson:"playtime" json:"playtime"`
+	Email       string `bson:"emailLower" json:"emailLower"`
 }
 
 type GameSessionResult struct {
-	Session     lib.GameSession
-	Wins        int
-	Losses      int
-	CreatorName string
+	Session         lib.GameSession
+	Wins            int
+	Losses          int
+	CreatorName     string
+	Email           string
+	PreliminaryRank int
+	Playtime        int
 }
 
 type By func(s1, s2 *GameSessionResult) bool
@@ -61,21 +66,21 @@ func (s *resultSorter) Less(i, j int) bool {
 }
 
 //shameless copying, perhaps put into a library later
-func ConnectToMongoAndGetCollection() *mgo.Collection {
+func ConnectToMongoAndGetCollection() (c *mgo.Collection, m *mgo.Session) {
 	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
 	mongoSession, err := mgo.Dial(connectionURL)
 	if err != nil {
 		panic(err)
 	}
-	c := mongoSession.DB(lib.DatabaseName).C(lib.CollectionName)
+	c = mongoSession.DB(lib.DatabaseName).C(lib.CollectionName)
 	fmt.Println("Connected to collection", lib.CollectionName)
-	return c
+	return c, mongoSession
 }
 
 func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) []lib.GameSession {
 	var gameSessions []lib.GameSession
 	queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true}
-	selection := bson.M{"team": 1}
+	selection := bson.M{"team": 1, "creator": 1}
 	err := levelSessionsCollection.Find(queryParameters).Select(selection).All(&gameSessions)
 	if err != nil {
 		panic(err)
@@ -101,19 +106,31 @@ func getWinsAndLosses(s lib.GameSession, r redis.Conn) GameSessionResult {
 }
 
 func (r GameSessionResult) getCreatorName(c *mgo.Collection) GameSessionResult {
-
 	creatorName := MongoCreatorName{}
-	selection := bson.M{"creatorName": 1}
+	selection := bson.M{"creatorName": 1, "playtime": 1}
 	err := c.FindId(r.Session.ID).Select(selection).One(&creatorName)
 	if err != nil {
 		panic(err)
 	}
 	r.CreatorName = string(creatorName.CreatorName)
+	r.Playtime = int(creatorName.Playtime)
+	return r
+}
+
+func (r GameSessionResult) getSessionDetails(m *mgo.Session) GameSessionResult {
+	sessionDetails := MongoCreatorName{}
+	selection := bson.M{"emailLower": 1}
+	c := m.DB(lib.DatabaseName).C("users")
+	err := c.FindId(bson.ObjectIdHex(r.Session.Creator)).Select(selection).One(&sessionDetails)
+	if err != nil {
+		panic(err)
+	}
+	r.Email = string(sessionDetails.Email)
 	return r
 }
 
 func main() {
-	c := ConnectToMongoAndGetCollection()
+	c, m := ConnectToMongoAndGetCollection()
 	unprocessedSessions := GetAllRelevantSessions(c)
 	r := lib.ConnectToRedis()
 	var results []GameSessionResult
@@ -122,30 +139,63 @@ func main() {
 	}
 
 	increasingWins := func(r1, r2 *GameSessionResult) bool {
-		return r1.Wins > r2.Wins
+		return (r1.Wins - r1.Losses) > (r2.Wins - r2.Losses)
 	}
-	decreasingLosses := func(r1, r2 *GameSessionResult) bool {
+	/*decreasingLosses := func(r1, r2 *GameSessionResult) bool {
 		return r1.Losses < r2.Losses
-	}
-	OrderedBy(increasingWins, decreasingLosses).Sort(results)
+	}*/
+	OrderedBy(increasingWins).Sort(results)
 	for i, result := range results {
 		results[i] = result.getCreatorName(c)
 	}
-	fmt.Println("Top ogres")
-	for i := 0; i < len(results); i++ {
-		result := results[i]
-		if result.Session.Team != "ogres" {
-			continue
+	for i, result := range results {
+		results[i] = result.getSessionDetails(m)
+	}
+	var ogres []GameSessionResult
+	var humans []GameSessionResult
+	for _, result := range results {
+		if result.Session.Team == "ogres" {
+			ogres = append(ogres, result)
+		} else {
+			humans = append(humans, result)
 		}
-		fmt.Println("Creator:", result.CreatorName, "Team:", result.Session.Team, "Wins:", result.Wins, "Losses:", result.Losses)
+	}
+	/*humanLength := len(humans)
+		ogreLength := len(ogres)
+	LoopRestart:
+		for i, humanSession := range humans {
+			for j, ogreSession := range ogres {
+				if humanSession.CreatorName != ogreSession.CreatorName {
+					continue
+				}
+				//now the loop has found a duplicate
+				if i < j {
+					ogres = append(ogres[:j], ogres[j+1:]...)
+					goto LoopRestart
+				} else if i > j {
+					fmt.Println("i is", i, "j is", j)
+					humans = append(humans[:i], humans[i+1:]...)
+					goto LoopRestart
+				} else if i == j {
+					humanRatio := float64((humanSession.Wins - humanSession.Losses)) / float64(humanLength)
+					ogreRatio := float64(ogreSession.Wins-ogreSession.Losses) / float64(ogreLength)
+					if humanRatio > ogreRatio {
+						ogres = append(ogres[:j], ogres[j+1:]...)
+					} else {
+						humans = append(humans[:i], humans[i+1:]...)
+					}
+					goto LoopRestart
+				}
+			}
+		}*/
+
+	fmt.Println("Top ogres")
+	for _, result := range ogres {
+		fmt.Printf("%d,%s,%s,%s,%d,%d,%d\n", result.PreliminaryRank, bson.ObjectId(result.Session.ID), result.CreatorName, result.Email, result.Playtime, result.Wins, result.Losses)
 	}
 	fmt.Println("Top humans")
-	for i := 0; i < len(results); i++ {
-		result := results[i]
-		if result.Session.Team != "humans" {
-			continue
-		}
-		fmt.Println("Creator:", result.CreatorName, "Team:", result.Session.Team, "Wins:", result.Wins, "Losses:", result.Losses)
+	for _, result := range humans {
+		fmt.Printf("%d,%s,%s,%s,%d,%d,%d\n", result.PreliminaryRank, bson.ObjectId(result.Session.ID), result.CreatorName, result.Email, result.Playtime, result.Wins, result.Losses)
 	}
 
 }

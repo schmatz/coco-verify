@@ -13,14 +13,15 @@ const MongoURL string = "***REMOVED***"
 const MongoUsername string = "***REMOVED***"
 const MongoPassword string = "***REMOVED***"
 const RedisPassword string = "***REMOVED***"
-const RedisHost string = "***REMOVED***:6379"
+const RedisHost string = "***REMOVED***"
 const UnprocessedSetName string = "unprocessed"
 const ProcessedSetName string = "processed"
 const ProcessingName string = "processing"
 
 type GameSession struct {
-	ID   bson.ObjectId `bson:"_id,omitempty"`
-	Team string
+	ID      bson.ObjectId `bson:"_id,omitempty"`
+	Team    string
+	Creator string `bson:"creator,omitempty"`
 }
 
 type GameSessionPair [2]GameSession
@@ -33,6 +34,9 @@ func (g *GameSession) GetWinningRedisKey() string {
 }
 func (g *GameSession) GetLosingRedisKey() string {
 	return g.ID.Hex() + "l"
+}
+func (g *GameSession) GetTieRedisKey() string {
+	return g.ID.Hex() + "t"
 }
 
 func newPool() *redis.Pool {
@@ -63,10 +67,10 @@ func ConnectToRedis() redis.Conn {
 	if err != nil {
 		panic(err)
 	}
-	isAuth, err := redisConnection.Do("AUTH", RedisPassword)
+	/*isAuth, err := redisConnection.Do("AUTH", RedisPassword)
 	if isAuth != "OK" || err != nil {
 		panic("Redis authentication failed!")
-	}
+	}*/
 	fmt.Println("Connected to Redis!")
 	return redisConnection
 }

@@ -56,16 +56,14 @@ func simulateGame(pairToSimulate lib.GameSessionPair) GameSessionResults {
 func addResultsToWinsAndLosses(resultString string, gameSessionPair lib.GameSessionPair, r redis.Conn) {
 	var winningIndex, losingIndex int
 	if resultString == "tie" {
-		/*
-			_, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetLosingRedisKey(), gameSessionPair[1].ID.Hex()))
-			if err != nil {
-				panic(err)
-			}
-			_, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetLosingRedisKey(), gameSessionPair[0].ID.Hex()))
-			if err != nil {
-				panic(err)
-			}
-		*/
+		_, err := redis.Int(r.Do("SADD", gameSessionPair[0].GetTieRedisKey(), gameSessionPair[1].ID.Hex()))
+		if err != nil {
+			panic(err)
+		}
+		_, err = redis.Int(r.Do("SADD", gameSessionPair[1].GetTieRedisKey(), gameSessionPair[0].ID.Hex()))
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		switch resultString {
 		case "humans":

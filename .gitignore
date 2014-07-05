@@ -2,3 +2,21 @@
 client/client
 
 results/results
+
+*.csv
+
+lib/results.numbers/Index.zip
+
+lib/results.numbers/Metadata/BuildVersionHistory.plist
+
+lib/results.numbers/Metadata/DocumentIdentifier
+
+lib/results.numbers/Metadata/Properties.plist
+
+lib/results.numbers/preview-micro.jpg
+
+lib/results.numbers/preview-web.jpg
+
+lib/results.numbers/preview.jpg
+
+client/client_ubuntu
