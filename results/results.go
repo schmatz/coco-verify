@@ -67,7 +67,7 @@ func (s *resultSorter) Less(i, j int) bool {
 
 //shameless copying, perhaps put into a library later
 func ConnectToMongoAndGetCollection() (c *mgo.Collection, m *mgo.Session) {
-	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
+	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?authSource=admin"
 	mongoSession, err := mgo.Dial(connectionURL)
 	if err != nil {
 		panic(err)
@@ -79,7 +79,7 @@ func ConnectToMongoAndGetCollection() (c *mgo.Collection, m *mgo.Session) {
 
 func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) []lib.GameSession {
 	var gameSessions []lib.GameSession
-	queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true}
+	queryParameters := bson.M{"level.original": "53558b5a9914f5a90d7ccddb", "submitted": true}
 	selection := bson.M{"team": 1, "creator": 1}
 	err := levelSessionsCollection.Find(queryParameters).Select(selection).All(&gameSessions)
 	if err != nil {
@@ -141,9 +141,6 @@ func main() {
 	increasingWins := func(r1, r2 *GameSessionResult) bool {
 		return (r1.Wins - r1.Losses) > (r2.Wins - r2.Losses)
 	}
-	/*decreasingLosses := func(r1, r2 *GameSessionResult) bool {
-		return r1.Losses < r2.Losses
-	}*/
 	OrderedBy(increasingWins).Sort(results)
 	for i, result := range results {
 		results[i] = result.getCreatorName(c)
@@ -160,34 +157,6 @@ func main() {
 			humans = append(humans, result)
 		}
 	}
-	/*humanLength := len(humans)
-		ogreLength := len(ogres)
-	LoopRestart:
-		for i, humanSession := range humans {
-			for j, ogreSession := range ogres {
-				if humanSession.CreatorName != ogreSession.CreatorName {
-					continue
-				}
-				//now the loop has found a duplicate
-				if i < j {
-					ogres = append(ogres[:j], ogres[j+1:]...)
-					goto LoopRestart
-				} else if i > j {
-					fmt.Println("i is", i, "j is", j)
-					humans = append(humans[:i], humans[i+1:]...)
-					goto LoopRestart
-				} else if i == j {
-					humanRatio := float64((humanSession.Wins - humanSession.Losses)) / float64(humanLength)
-					ogreRatio := float64(ogreSession.Wins-ogreSession.Losses) / float64(ogreLength)
-					if humanRatio > ogreRatio {
-						ogres = append(ogres[:j], ogres[j+1:]...)
-					} else {
-						humans = append(humans[:i], humans[i+1:]...)
-					}
-					goto LoopRestart
-				}
-			}
-		}*/
 
 	fmt.Println("Top ogres")
 	for _, result := range ogres {

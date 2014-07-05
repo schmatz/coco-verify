@@ -41,7 +41,7 @@ func simulateGame(pairToSimulate lib.GameSessionPair) GameSessionResults {
 	var results GameSessionResults
 	results.GameSessionPair = pairToSimulate
 	command := exec.Command("coffee", "simulate.coffee", pairToSimulate[0].ID.Hex(), pairToSimulate[1].ID.Hex())
-	command.Dir = "***REMOVED***"
+	command.Dir = "/home/ubuntu/codecombat/scripts/"
 	out, err := command.Output()
 	if err != nil {
 		fmt.Println("error running command!")

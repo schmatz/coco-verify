@@ -13,7 +13,7 @@ type Simulator struct {
 }
 
 func ConnectToMongoAndGetCollection() *mgo.Collection {
-	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
+	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?authSource=admin"
 	mongoSession, err := mgo.Dial(connectionURL)
 	if err != nil {
 		panic(err)

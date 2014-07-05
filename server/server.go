@@ -11,7 +11,7 @@ import (
 const numberOfTopGamesToRank = 500
 
 func ConnectToMongoAndGetCollection() *mgo.Collection {
-	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?***REMOVED***"
+	connectionURL := "mongodb://" + lib.MongoUsername + ":" + lib.MongoPassword + "@" + lib.MongoURL + ":27017/" + lib.DatabaseName + "?authSource=admin"
 	mongoSession, err := mgo.Dial(connectionURL)
 	if err != nil {
 		panic(err)
@@ -24,7 +24,7 @@ func ConnectToMongoAndGetCollection() *mgo.Collection {
 func GetAllRelevantSessions(levelSessionsCollection *mgo.Collection) (topHumanSessions, topOgreSessions []lib.GameSession) {
 	teams := [2]string{"humans", "ogres"}
 	for _, teamName := range teams {
-		queryParameters := bson.M{"level.original": "***REMOVED***", "submitted": true, "team": teamName}
+		queryParameters := bson.M{"level.original": "53558b5a9914f5a90d7ccddb", "submitted": true, "team": teamName}
 		selection := bson.M{"team": 1, "totalScore": 1}
 		sort := bson.M{"totalScore": -1}
 		pipe := levelSessionsCollection.Pipe([]bson.M{{"$match": queryParameters}, {"$project": selection}, {"$sort": sort}, {"$limit": numberOfTopGamesToRank}})
